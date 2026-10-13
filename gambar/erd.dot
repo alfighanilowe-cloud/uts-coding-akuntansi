@@ -1,0 +1,39 @@
+digraph ERD {
+  graph [rankdir=LR, nodesep=0.8, ranksep=1.3, fontname="Times-Roman", bgcolor="white", pad=0.3];
+  node  [shape=plaintext, fontname="Times-Roman", fontsize=13, fontcolor=black];
+  edge  [fontname="Times-Roman", fontsize=12, color=black, fontcolor=black];
+
+  coa [label=<
+   <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="5">
+    <TR><TD COLSPAN="3" BGCOLOR="#D9D9D9"><B>chart_of_accounts</B></TD></TR>
+    <TR><TD>PK</TD><TD ALIGN="LEFT">account_id</TD><TD ALIGN="LEFT">SERIAL</TD></TR>
+    <TR><TD>UK</TD><TD ALIGN="LEFT">account_code</TD><TD ALIGN="LEFT">VARCHAR(10)</TD></TR>
+    <TR><TD></TD><TD ALIGN="LEFT">account_name</TD><TD ALIGN="LEFT">VARCHAR(100)</TD></TR>
+    <TR><TD></TD><TD ALIGN="LEFT">normal_balance</TD><TD ALIGN="LEFT">DEBIT | KREDIT</TD></TR>
+    <TR><TD></TD><TD ALIGN="LEFT">report_class</TD><TD ALIGN="LEFT">ASET ... BEBAN</TD></TR>
+   </TABLE>>];
+
+  lines [label=<
+   <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="5">
+    <TR><TD COLSPAN="3" BGCOLOR="#D9D9D9"><B>journal_lines</B></TD></TR>
+    <TR><TD>PK</TD><TD ALIGN="LEFT">line_id</TD><TD ALIGN="LEFT">BIGSERIAL</TD></TR>
+    <TR><TD>FK</TD><TD ALIGN="LEFT">header_id</TD><TD ALIGN="LEFT">BIGINT</TD></TR>
+    <TR><TD>FK</TD><TD ALIGN="LEFT">account_id</TD><TD ALIGN="LEFT">INT</TD></TR>
+    <TR><TD></TD><TD ALIGN="LEFT">debit</TD><TD ALIGN="LEFT">NUMERIC(18,2) &gt;= 0</TD></TR>
+    <TR><TD></TD><TD ALIGN="LEFT">credit</TD><TD ALIGN="LEFT">NUMERIC(18,2) &gt;= 0</TD></TR>
+   </TABLE>>];
+
+  hdr [label=<
+   <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="5">
+    <TR><TD COLSPAN="3" BGCOLOR="#D9D9D9"><B>journal_headers</B></TD></TR>
+    <TR><TD>PK</TD><TD ALIGN="LEFT">journal_id</TD><TD ALIGN="LEFT">BIGSERIAL</TD></TR>
+    <TR><TD></TD><TD ALIGN="LEFT">trx_date</TD><TD ALIGN="LEFT">DATE</TD></TR>
+    <TR><TD>UK</TD><TD ALIGN="LEFT">reference_no</TD><TD ALIGN="LEFT">VARCHAR(30)</TD></TR>
+    <TR><TD></TD><TD ALIGN="LEFT">description</TD><TD ALIGN="LEFT">TEXT</TD></TR>
+    <TR><TD></TD><TD ALIGN="LEFT">posting_status</TD><TD ALIGN="LEFT">DRAFT | POSTED</TD></TR>
+   </TABLE>>];
+
+  coa -> lines [dir=both, arrowtail=tee, arrowhead=crowodot, label="1 : N\n(dipakai oleh)", fontsize=12];
+  hdr -> lines [dir=both, arrowtail=tee, arrowhead=crow, label="1 : N\n(terdiri dari >= 2 baris)", fontsize=12, constraint=true];
+  {rank=same; coa; hdr}
+}

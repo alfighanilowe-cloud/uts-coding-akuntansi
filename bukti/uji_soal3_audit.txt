@@ -1,0 +1,85 @@
+=== UJI 1: Voucher seimbang via RPC (Beban Listrik 750.000 + Beban Transportasi 250.000 / Bank 1.000.000)
+ journal_id | reference_no |         created_by          |        hash         
+------------+--------------+-----------------------------+---------------------
+          1 | BKK-2610-001 | rina@diponegoro-logistik.id | 15322ad037c34407...
+(1 row)
+
+=== UJI 2: Tidak seimbang -> DITOLAK
+psql:uji_audit.sql:8: ERROR:  Jurnal tidak seimbang: Debit 900000 <> Kredit 800000.
+CONTEXT:  PL/pgSQL function rpc_create_cash_voucher(date,text,text,text,jsonb) line 21 at RAISE
+=== UJI 3: Mendebit akun Kas -> DITOLAK
+psql:uji_audit.sql:11: ERROR:  Akun kas/bank (1-1100) hanya boleh di sisi KREDIT pada voucher kas keluar.
+CONTEXT:  PL/pgSQL function rpc_create_cash_voucher(date,text,text,text,jsonb) line 18 at RAISE
+=== UJI 4: Tanggal masa depan -> DITOLAK
+psql:uji_audit.sql:14: ERROR:  Tanggal transaksi tidak boleh di masa depan.
+CONTEXT:  PL/pgSQL function rpc_create_cash_voucher(date,text,text,text,jsonb) line 4 at RAISE
+=== UJI 5: UPDATE jurnal POSTED -> DITOLAK
+psql:uji_audit.sql:16: ERROR:  Jurnal BKK-2610-001 sudah POSTED dan tidak boleh di-UPDATE. Gunakan jurnal pembalik (storno).
+CONTEXT:  PL/pgSQL function fn_header_guard() line 21 at RAISE
+=== UJI 6: DELETE jurnal POSTED -> DITOLAK
+psql:uji_audit.sql:18: ERROR:  Jurnal BKK-2610-001 sudah POSTED dan tidak boleh di-DELETE. Gunakan jurnal pembalik (storno).
+CONTEXT:  PL/pgSQL function fn_header_guard() line 15 at RAISE
+=== UJI 7: UPDATE & INSERT baris pada jurnal POSTED -> DITOLAK
+psql:uji_audit.sql:20: ERROR:  Baris milik jurnal POSTED tidak boleh di-UPDATE . Gunakan jurnal pembalik (storno).
+CONTEXT:  PL/pgSQL function fn_lines_guard() line 6 at RAISE
+psql:uji_audit.sql:21: ERROR:  Baris milik jurnal POSTED tidak boleh di-INSERT . Gunakan jurnal pembalik (storno).
+CONTEXT:  PL/pgSQL function fn_lines_guard() line 6 at RAISE
+=== UJI 8: TRUNCATE -> DITOLAK
+psql:uji_audit.sql:23: ERROR:  TRUNCATE pada tabel journal_lines dilarang (jejak audit).
+CONTEXT:  PL/pgSQL function fn_no_truncate() line 2 at RAISE
+=== UJI 9: Klien memalsukan created_by (direktur@palsu.com) lewat INSERT langsung -> dioverride server
+ reference_no |         created_by          | created_at 
+--------------+-----------------------------+------------
+ DRAFT-X      | rina@diponegoro-logistik.id | 2026-10-13
+(1 row)
+
+=== UJI 10: Storno jurnal POSTED -> BERHASIL; storno kedua kali -> DITOLAK
+ rpc_reverse_journal 
+---------------------
+                   3
+(1 row)
+
+psql:uji_audit.sql:29: ERROR:  Jurnal BKK-2610-001 sudah pernah dibalik.
+CONTEXT:  PL/pgSQL function rpc_reverse_journal(bigint,text) line 10 at RAISE
+=== UJI 11: Isi jurnal pembalik (debit/kredit tertukar)
+    reference_no     | journal_type | reversal_of | account_code |   debit    |   credit   
+---------------------+--------------+-------------+--------------+------------+------------
+ BKK-2610-001        | KAS_KELUAR   |             | 6-1300       |  750000.00 |       0.00
+ BKK-2610-001        | KAS_KELUAR   |             | 6-1400       |  250000.00 |       0.00
+ BKK-2610-001        | KAS_KELUAR   |             | 1-1200       |       0.00 | 1000000.00
+ STORNO-BKK-2610-001 | STORNO       |           1 | 6-1300       |       0.00 |  750000.00
+ STORNO-BKK-2610-001 | STORNO       |           1 | 6-1400       |       0.00 |  250000.00
+ STORNO-BKK-2610-001 | STORNO       |           1 | 1-1200       | 1000000.00 |       0.00
+(6 rows)
+
+=== UJI 12: Verifikasi hash seluruh jurnal POSTED
+    reference_no     | post_seq | hash_valid | chain_valid 
+---------------------+----------+------------+-------------
+ BKK-2610-001        |        1 | t          | t
+ STORNO-BKK-2610-001 |        2 | t          | t
+(2 rows)
+
+=== UJI 13: Simulasi peretas/DBA mematikan trigger lalu mengubah nominal langsung
+ reference_no | hash_valid | chain_valid 
+--------------+------------+-------------
+ BKK-2610-001 | f          | t
+(1 row)
+
+=== UJI 14: UPDATE/DELETE audit_log -> DITOLAK
+psql:uji_audit.sql:41: ERROR:  audit_log bersifat append-only: UPDATE ditolak.
+CONTEXT:  PL/pgSQL function fn_audit_readonly() line 2 at RAISE
+psql:uji_audit.sql:42: ERROR:  audit_log bersifat append-only: DELETE ditolak.
+CONTEXT:  PL/pgSQL function fn_audit_readonly() line 2 at RAISE
+=== UJI 15: Cuplikan audit_log
+ log_id |   table_name    | action | record_id |            actor            
+--------+-----------------+--------+-----------+-----------------------------
+      1 | journal_headers | INSERT | 1         | rina@diponegoro-logistik.id
+      2 | journal_lines   | INSERT | 1         | rina@diponegoro-logistik.id
+      3 | journal_lines   | INSERT | 2         | rina@diponegoro-logistik.id
+      4 | journal_lines   | INSERT | 3         | rina@diponegoro-logistik.id
+      5 | journal_headers | UPDATE | 1         | rina@diponegoro-logistik.id
+      6 | journal_headers | INSERT | 2         | rina@diponegoro-logistik.id
+      7 | journal_headers | INSERT | 3         | rina@diponegoro-logistik.id
+      8 | journal_lines   | INSERT | 5         | rina@diponegoro-logistik.id
+(8 rows)
+

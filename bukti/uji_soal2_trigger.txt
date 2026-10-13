@@ -1,0 +1,42 @@
+=== UJI 1: PURCHASE 15 rak @275.000
+=== UJI 2: SALE 6 rak
+=== UJI 3: ADJUSTMENT -2 (rusak saat opname)
+=== UJI 4: SALE 9 padahal stok 7 -> HARUS DITOLAK
+psql:02_uji_trigger.sql:9: ERROR:  Transaksi SALE dibatalkan: stok BRG-001 hanya 7 unit, diminta 9 unit.
+HINT:  Periksa stok fisik atau catat PURCHASE terlebih dahulu.
+CONTEXT:  PL/pgSQL function trg_update_stock_and_journal() line 27 at RAISE
+=== UJI 5: SALE qty negatif -> HARUS DITOLAK
+psql:02_uji_trigger.sql:11: ERROR:  Qty -3 untuk SALE harus lebih dari 0
+CONTEXT:  PL/pgSQL function trg_update_stock_and_journal() line 11 at RAISE
+=== UJI 6: Dua SALE (4+4) dalam satu transaksi -> yang kedua gagal, semua rollback
+psql:02_uji_trigger.sql:15: ERROR:  Transaksi SALE dibatalkan: stok BRG-001 hanya 3 unit, diminta 4 unit.
+HINT:  Periksa stok fisik atau catat PURCHASE terlebih dahulu.
+CONTEXT:  PL/pgSQL function trg_update_stock_and_journal() line 27 at RAISE
+=== UJI 7: UPDATE langsung stok jadi negatif (bypass trigger) -> DITOLAK CHECK
+psql:02_uji_trigger.sql:18: ERROR:  new row for relation "inventory_items" violates check constraint "chk_stock_nonneg"
+DETAIL:  Failing row contains (BRG-001, Rak Besi Gudang, -1, 275000.00).
+=== POSISI STOK
+ item_id |    item_name     | stock_qty | unit_cost |   nilai    
+---------+------------------+-----------+-----------+------------
+ BRG-001 | Rak Besi Gudang  |         7 | 275000.00 | 1925000.00
+ BRG-002 | Lakban Industri  |         0 |  18000.00 |       0.00
+ BRG-003 | Bubble Wrap Roll |         0 |  95000.00 |       0.00
+(3 rows)
+
+=== JURNAL OTOMATIS
+ reference_no | account_code |       account_name       |   debit    |   credit   
+--------------+--------------+--------------------------+------------+------------
+ INV-000001   | 1-1400       | Persediaan Barang Dagang | 4125000.00 |       0.00
+ INV-000001   | 2-1100       | Utang Usaha              |       0.00 | 4125000.00
+ INV-000002   | 5-1100       | Beban Pokok Pendapatan   | 1650000.00 |       0.00
+ INV-000002   | 1-1400       | Persediaan Barang Dagang |       0.00 | 1650000.00
+ INV-000003   | 6-9100       | Beban Selisih Persediaan |  550000.00 |       0.00
+ INV-000003   | 1-1400       | Persediaan Barang Dagang |       0.00 |  550000.00
+(6 rows)
+
+=== REKONSILIASI: saldo GL Persediaan vs nilai stok fisik
+  saldo_gl  | nilai_stok_fisik 
+------------+------------------
+ 1925000.00 |       1925000.00
+(1 row)
+

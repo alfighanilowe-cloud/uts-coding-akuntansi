@@ -1,0 +1,42 @@
+=== UJI 1: Jurnal seimbang (Beban Sewa 2.500.000 / Kas 2.500.000) -> DITERIMA
+=== UJI 2: Jurnal TIDAK seimbang (Debit 1.200.000 vs Kredit 1.000.000) -> DITOLAK saat POSTING
+psql:02_uji_skema.sql:16: ERROR:  Posting ditolak: jurnal JU-002 tidak seimbang (Debit 1200000.00 <> Kredit 1000000.00).
+CONTEXT:  PL/pgSQL function fn_enforce_balanced_posting() line 20 at RAISE
+=== UJI 3: Header langsung dikirim berstatus POSTED (bypass API) -> DITOLAK
+psql:02_uji_skema.sql:19: ERROR:  Jurnal JU-003 harus dibuat DRAFT lebih dulu, baru diposting setelah baris diisi.
+CONTEXT:  PL/pgSQL function fn_enforce_balanced_posting() line 8 at RAISE
+=== UJI 4: Posting jurnal tanpa baris / 1 baris -> DITOLAK
+psql:02_uji_skema.sql:23: ERROR:  Posting ditolak: jurnal JU-004 hanya punya 0 baris (minimal 2).
+CONTEXT:  PL/pgSQL function fn_enforce_balanced_posting() line 17 at RAISE
+=== UJI 5: Debit negatif -> DITOLAK (chk_debit_nonneg)
+psql:02_uji_skema.sql:26: ERROR:  new row for relation "journal_lines" violates check constraint "chk_debit_nonneg"
+DETAIL:  Failing row contains (5, 2, 1, -5000.00, 0.00).
+=== UJI 6: Debit = 0 dan Kredit = 0 -> DITOLAK (chk_not_both_zero)
+psql:02_uji_skema.sql:29: ERROR:  new row for relation "journal_lines" violates check constraint "chk_not_both_zero"
+DETAIL:  Failing row contains (6, 2, 1, 0.00, 0.00).
+=== UJI 7: Hapus akun Kas yang sudah dipakai -> DITOLAK (ON DELETE RESTRICT)
+psql:02_uji_skema.sql:32: ERROR:  update or delete on table "chart_of_accounts" violates foreign key constraint "journal_lines_account_id_fkey" on table "journal_lines"
+DETAIL:  Key (account_id)=(1) is still referenced from table "journal_lines".
+=== UJI 8: Hapus header yang masih punya baris -> DITOLAK (ON DELETE RESTRICT)
+psql:02_uji_skema.sql:35: ERROR:  update or delete on table "journal_headers" violates foreign key constraint "journal_lines_header_id_fkey" on table "journal_lines"
+DETAIL:  Key (journal_id)=(1) is still referenced from table "journal_lines".
+=== UJI 9: Tambah baris ke jurnal POSTED -> DITOLAK
+psql:02_uji_skema.sql:38: ERROR:  Jurnal 1 sudah POSTED; baris tidak boleh di-INSERT (gunakan jurnal pembalik).
+CONTEXT:  PL/pgSQL function fn_lock_posted_lines() line 7 at RAISE
+=== UJI 10: Baris dengan akun yang tidak ada -> DITOLAK (foreign key)
+psql:02_uji_skema.sql:41: ERROR:  insert or update on table "journal_lines" violates foreign key constraint "journal_lines_account_id_fkey"
+DETAIL:  Key (account_id)=(999) is not present in table "chart_of_accounts".
+=== HASIL AKHIR: jurnal POSTED dan saldo
+ reference_no | posting_status | account_code | account_name |   debit    |   credit   
+--------------+----------------+--------------+--------------+------------+------------
+ JU-001       | POSTED         | 6-1100       | Beban Sewa   | 2500000.00 |       0.00
+ JU-001       | POSTED         | 1-1100       | Kas          |       0.00 | 2500000.00
+(2 rows)
+
+ reference_no | posting_status | total_debit | total_kredit 
+--------------+----------------+-------------+--------------
+ JU-001       | POSTED         |  2500000.00 |   2500000.00
+ JU-002       | DRAFT          |  1200000.00 |   1000000.00
+ JU-004       | DRAFT          |             |             
+(3 rows)
+

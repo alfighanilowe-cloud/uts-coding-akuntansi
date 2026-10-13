@@ -1,0 +1,52 @@
+##### DEMO A - TANPA PENGUNCIAN (baca-cek-tulis di sisi aplikasi)
+[Kasir A] membaca stok = 1
+[Kasir B] membaca stok = 1
+[Kasir A] penjualan BERHASIL
+[Kasir B] penjualan BERHASIL
+ stok_akhir | unit_terjual 
+------------+--------------
+          0 |            2
+(1 row)
+
+>> MASALAH: 2 unit terjual padahal stok awal hanya 1 (overselling).
+
+##### DEMO B - SELECT ... FOR UPDATE di dalam trigger
+[Kasir A] 01:45:25.057 BEGIN + INSERT SALE 1 unit BRG-002
+[Kasir B] 01:45:25.558 BEGIN + INSERT SALE 1 unit BRG-002
+ERROR:  Transaksi SALE dibatalkan: stok BRG-002 hanya 0 unit, diminta 1 unit.
+[Kasir A] 01:45:28.098 COMMIT - penjualan BERHASIL
+[Kasir B] 01:45:28.098 ROLLBACK - penjualan DITOLAK (setelah menunggu kunci Kasir A)
+ stok_akhir 
+------------
+          0
+(1 row)
+
+ trx_id | trx_type | qty 
+--------+----------+-----
+     12 | SALE     |   1
+(1 row)
+
+>> HASIL: Kasir B tertahan sampai Kasir A selesai, lalu ditolak karena stok sudah 0. Hanya 1 penjualan tersimpan.
+
+##### DEMO C - ISOLASI SERIALIZABLE
+[Kasir A] 01:45:28.183 BEGIN ISOLATION LEVEL SERIALIZABLE
+[Kasir B] 01:45:28.684 BEGIN ISOLATION LEVEL SERIALIZABLE
+ stock_qty 
+-----------
+         1
+(1 row)
+
+[Kasir A] 01:45:30.224 COMMIT - penjualan BERHASIL
+ stock_qty 
+-----------
+         1
+(1 row)
+
+ERROR:  could not serialize access due to concurrent update
+[Kasir B] 01:45:30.721 ROLLBACK - harus diulang (retry)
+ stok_akhir | unit_terjual 
+------------+--------------
+          0 |            1
+(1 row)
+
+>> HASIL: salah satu kasir menerima ERROR 40001 (serialization failure) dan harus mengulang; tidak ada overselling.
